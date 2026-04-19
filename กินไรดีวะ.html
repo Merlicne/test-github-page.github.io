@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>กินไรดีวะ? — Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #1a1a1a;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh;
+  font-family: 'Noto Sans Thai', system-ui, sans-serif;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes pop {
+  0% { transform: scale(0.7); opacity: 0; }
+  70% { transform: scale(1.08); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes slideUp {
+  0% { transform: translateY(30px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@keyframes shake {
+  0%,100% { transform: rotate(0deg); }
+  20% { transform: rotate(-8deg); }
+  40% { transform: rotate(8deg); }
+  60% { transform: rotate(-5deg); }
+  80% { transform: rotate(5deg); }
+}
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes countDown {
+  from { transform: scale(1.5); opacity: 1; }
+  to { transform: scale(1); opacity: 0.6; }
+}
+</style>
+</head>
+<body>
+<script type="text/babel">
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accentColor": "#FF6B00",
+  "darkMode": false,
+  "showPersonality": true
+}/*EDITMODE-END*/;
+
+// ── Data ──────────────────────────────────────────────────────
+const RESTAURANTS = [
+  { name: 'ร้านป้านวลยำแซ่บ', dist: '1.2 km', type: 'อาหารอีสาน', emoji: '🌶️' },
+  { name: 'ข้าวมันไก่เจ้าดัง', dist: '0.8 km', type: 'อาหารไทย', emoji: '🍗' },
+  { name: 'ก๋วยเตี๋ยวเรือโบราณ', dist: '2.1 km', type: 'ก๋วยเตี๋ยว', emoji: '🍜' },
+  { name: 'ซูชิเซนเซย์', dist: '1.5 km', type: 'อาหารญี่ปุ่น', emoji: '🍱' },
+  { name: 'พิซซ่าป๊อปป้า', dist: '0.5 km', type: 'อาหารฝรั่ง', emoji: '🍕' },
+  { name: 'หมูกะทะครัวลุงแดง', dist: '3.0 km', type: 'หมูกะทะ', emoji: '🥩' },
+];
+const FOOD_TYPES = ['อาหารอีสาน','อาหารไทย','ก๋วยเตี๋ยว','อาหารญี่ปุ่น','อาหารฝรั่ง','หมูกะทะ','อาหารเกาหลี','ข้าวหมูแดง'];
+const MENUS = ['ข้าวผัดกระเพรา','ส้มตำไทย','ลาบหมู','ต้มยำกุ้ง','ผัดไทย','ข้าวมันไก่','ราเมนโทนคตสึ','ยำวุ้นเส้น'];
+const MEMBERS = ['จั๊ม','ปักษ์','แต๋ว','แวว','มิ้ว'];
+const PERSONALITIES = [
+  { key: 'easy', icon: '😋', label: 'กินง่าย', desc: 'คุณไม่กดข้ามเลยในทุกการสุ่ม\nคนนี้กินอะไรก็ได้ของจริง!', color: '#4CAF50' },
+  { key: 'picky', icon: '🤔', label: 'ช่างเลือก...', desc: 'คุณขอข้ามมากกว่ากินได้\nคุณให้ความสำคัญกับอาหารที่กิน...สินะ', color: '#FF9800' },
+  { key: 'rebel', icon: '😤', label: 'ไม่ขึ้นตรงกับใคร', desc: 'คุณโหวตตรงข้ามกับคนส่วนใหญ่\nช่างเป็นคนที่มีทางของตัวเองจริงๆ', color: '#9C27B0' },
+];
+
+function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// ── Shared UI Components ──────────────────────────────────────
+function Btn({ children, onClick, variant = 'primary', accent = '#FF6B00', style = {}, disabled = false }) {
+  const base = {
+    borderRadius: 16, padding: '14px 20px', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+    fontFamily: 'Noto Sans Thai, system-ui', fontSize: 16, fontWeight: 700,
+    transition: 'all 0.15s', width: '100%', opacity: disabled ? 0.5 : 1,
+    ...style,
+  };
+  const variants = {
+    primary: { background: accent, color: '#fff', boxShadow: `0 4px 16px ${accent}55` },
+    secondary: { background: 'rgba(0,0,0,0.06)', color: '#333', boxShadow: 'none' },
+    outline: { background: 'transparent', color: accent, border: `2px solid ${accent}`, boxShadow: 'none' },
+    danger: { background: '#FF3B30', color: '#fff', boxShadow: '0 4px 16px #FF3B3055' },
+    ghost: { background: 'rgba(255,255,255,0.9)', color: '#333', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' },
+  };
+  return (
+    <button style={{ ...base, ...variants[variant] }} onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
+  );
+}
+
+function Tag({ children, active, accent, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      padding: '8px 16px', borderRadius: 20, border: active ? 'none' : '1.5px solid #ddd',
+      background: active ? accent : '#fff', color: active ? '#fff' : '#666',
+      fontFamily: 'Noto Sans Thai', fontSize: 14, fontWeight: 600,
+      cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap',
+    }}>{children}</button>
+  );
+}
+
+function Avatar({ name, size = 40, accent }) {
+  const colors = ['#FF6B00','#4CAF50','#2196F3','#E91E63','#9C27B0','#FF9800'];
+  const idx = name.charCodeAt(0) % colors.length;
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%', background: colors[idx],
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      color: '#fff', fontWeight: 700, fontSize: size * 0.38,
+      fontFamily: 'Noto Sans Thai', flexShrink: 0,
+    }}>{name[0]}</div>
+  );
+}
+
+function VoteBar({ yes, no, total }) {
+  const yPct = total ? (yes / total) * 100 : 50;
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ display: 'flex', gap: 4, height: 8, borderRadius: 4, overflow: 'hidden' }}>
+        <div style={{ width: `${yPct}%`, background: '#4CAF50', borderRadius: 4, transition: 'width 0.5s' }}/>
+        <div style={{ flex: 1, background: '#FF3B30', borderRadius: 4, transition: 'flex 0.5s' }}/>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+        <span style={{ fontSize: 12, color: '#4CAF50', fontWeight: 700 }}>✓ กินได้ {yes}</span>
+        <span style={{ fontSize: 12, color: '#FF3B30', fontWeight: 700 }}>✕ ขอข้าม {no}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Spinning Roulette ─────────────────────────────────────────
+function SpinningWheel({ spinning, item, accent }) {
+  return (
+    <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+      <div style={{
+        width: 130, height: 130, borderRadius: '50%',
+        border: `5px solid ${accent}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: `0 0 0 8px ${accent}22, 0 8px 32px ${accent}44`,
+        animation: spinning ? 'spin 0.5s linear infinite' : 'none',
+        background: `conic-gradient(from 0deg, ${accent}22 0deg, ${accent}44 60deg, ${accent}22 120deg, ${accent}44 180deg, ${accent}22 240deg, ${accent}44 300deg, ${accent}22 360deg)`,
+        fontSize: 48,
+        transition: 'all 0.3s',
+      }}>
+        {item?.emoji || '🎰'}
+      </div>
+      {spinning && (
+        <div style={{ display: 'flex', gap: 6 }}>
+          {[0,1,2].map(i => (
+            <div key={i} style={{
+              width: 8, height: 8, borderRadius: '50%', background: accent,
+              animation: `bounce 0.6s ease-in-out ${i * 0.2}s infinite`,
+            }}/>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Screen: Home ──────────────────────────────────────────────
+function HomeScreen({ onNavigate, accent }) {
+  const [mode, setMode] = React.useState('solo'); // solo | group
+  const [randType, setRandType] = React.useState('restaurant');
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff', paddingTop: 60 }}>
+      {/* Header */}
+      <div style={{ padding: '24px 24px 0', textAlign: 'center', animation: 'slideUp 0.4s ease' }}>
+        <div style={{ fontSize: 40, marginBottom: 4 }}>🍽️</div>
+        <h1 style={{ fontSize: 28, fontWeight: 900, color: accent, letterSpacing: -0.5 }}>กินไรดีวะ?</h1>
+        <p style={{ fontSize: 13, color: '#888', marginTop: 4, fontWeight: 500 }}>พอกันทีกับคำถามโลกแตก!</p>
+        <p style={{ fontSize: 12, color: '#bbb', marginTop: 2 }}>สุ่มเลย ไม่ต้องคิดให้ปวดเฮด</p>
+      </div>
+
+      {/* Mood Tags */}
+      <div style={{ padding: '20px 24px 0', display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+        {['เย็นนี้กินไรดีวะ?','กินไรก็ได้','หัวตื้อ','ร้านไหน'].map(t => (
+          <div key={t} style={{ padding: '6px 14px', borderRadius: 20, background: '#FFF3E8', color: accent, fontSize: 13, fontWeight: 600 }}>{t}</div>
+        ))}
+      </div>
+
+      {/* Solo / Group Toggle */}
+      <div style={{ padding: '20px 24px 0' }}>
+        <p style={{ fontSize: 13, color: '#999', fontWeight: 600, marginBottom: 10, textAlign: 'center' }}>คุณต้องการสุ่มแบบ</p>
+        <div style={{ display: 'flex', background: '#f0f0f0', borderRadius: 14, padding: 4, gap: 4 }}>
+          {['solo','group'].map(m => (
+            <button key={m} onClick={() => setMode(m)} style={{
+              flex: 1, padding: '11px 0', borderRadius: 10, border: 'none',
+              background: mode === m ? accent : 'transparent',
+              color: mode === m ? '#fff' : '#888',
+              fontFamily: 'Noto Sans Thai', fontWeight: 700, fontSize: 15,
+              cursor: 'pointer', transition: 'all 0.2s',
+              boxShadow: mode === m ? `0 2px 8px ${accent}55` : 'none',
+            }}>
+              {m === 'solo' ? '👤 เดี่ยว' : '👥 กลุ่ม'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Random Type */}
+      <div style={{ padding: '20px 24px 0' }}>
+        <p style={{ fontSize: 13, color: '#999', fontWeight: 600, marginBottom: 10, textAlign: 'center' }}>รูปแบบการสุ่ม</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[
+            { id: 'restaurant', icon: '📍', label: 'ร้านอาหารใกล้คุณ' },
+            { id: 'type', icon: '🍱', label: 'ประเภทอาหาร' },
+            { id: 'menu', icon: '📋', label: 'เมนูอาหาร' },
+          ].map(opt => (
+            <button key={opt.id} onClick={() => setRandType(opt.id)} style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '14px 16px', borderRadius: 14, border: `2px solid ${randType === opt.id ? accent : '#eee'}`,
+              background: randType === opt.id ? `${accent}10` : '#fafafa',
+              cursor: 'pointer', transition: 'all 0.2s', textAlign: 'left',
+            }}>
+              <span style={{ fontSize: 22 }}>{opt.icon}</span>
+              <span style={{ fontFamily: 'Noto Sans Thai', fontWeight: 600, fontSize: 15, color: randType === opt.id ? accent : '#444', flex: 1 }}>{opt.label}</span>
+              {randType === opt.id && <div style={{ width: 20, height: 20, borderRadius: '50%', background: accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="12" height="9" viewBox="0 0 12 9" fill="none"><path d="M1 4l3.5 3.5L11 1" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </div>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ flex: 1 }}/>
+
+      {/* CTA */}
+      <div style={{ padding: '16px 24px 32px', animation: 'slideUp 0.5s ease 0.1s both' }}>
+        <Btn accent={accent} onClick={() => {
+          if (mode === 'solo') onNavigate('solo-spin', { randType });
+          else onNavigate('group-name', { randType });
+        }} style={{ fontSize: 18, padding: '18px 0', borderRadius: 20 }}>
+          🎲 สุ่มเลย!
+        </Btn>
+        <div style={{ textAlign: 'center', marginTop: 10 }}>
+          <button onClick={() => {}} style={{ background: 'none', border: 'none', color: '#bbb', fontSize: 13, cursor: 'pointer', fontFamily: 'Noto Sans Thai' }}>วิธีใช้งาน</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Screen: Solo Spin ─────────────────────────────────────────
+function SoloSpinScreen({ onNavigate, accent, params }) {
+  const { randType } = params;
+  const [phase, setPhase] = React.useState('spinning'); // spinning | revealed
+  const [result, setResult] = React.useState(null);
+  const [skips, setSkips] = React.useState(0);
+  const MAX_SKIPS = 3;
+
+  const spin = React.useCallback(() => {
+    setPhase('spinning');
+    setResult(null);
+    setTimeout(() => {
+      const r = randType === 'restaurant' ? rand(RESTAURANTS)
+        : randType === 'type' ? { name: rand(FOOD_TYPES), emoji: '🍱', dist: null }
+        : { name: rand(MENUS), emoji: '🍽️', dist: null };
+      setResult(r);
+      setPhase('revealed');
+    }, 1600);
+  }, [randType]);
+
+  React.useEffect(() => { spin(); }, []);
+
+  const handleSkip = () => {
+    if (skips >= MAX_SKIPS - 1) {
+      onNavigate('solo-personality', { skips: skips + 1, accept: 0 });
+      return;
+    }
+    setSkips(s => s + 1);
+    spin();
+  };
+
+  const typeLabel = randType === 'restaurant' ? 'สุ่มร้านอาหารแบบเดี่ยว' : randType === 'type' ? 'สุ่มประเภทอาหารแบบเดี่ยว' : 'สุ่มเมนูแบบเดี่ยว';
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff' }}>
+      {/* Top bar */}
+      <div style={{ display: 'flex', alignItems: 'center', padding: '64px 20px 16px', gap: 12 }}>
+        <button onClick={() => onNavigate('home')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, padding: 4 }}>←</button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, color: '#999', fontWeight: 500 }}>{typeLabel}</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: accent }}>กินไรดีวะ?</div>
+        </div>
+        <button onClick={() => onNavigate('home')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#bbb', fontFamily: 'Noto Sans Thai', padding: '4px 8px', borderRadius: 8, border: '1px solid #eee' }}>เปลี่ยน</button>
+      </div>
+
+      {/* Main content */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 24px', gap: 24 }}>
+        <SpinningWheel spinning={phase === 'spinning'} item={result} accent={accent}/>
+
+        {phase === 'spinning' && (
+          <div style={{ textAlign: 'center', animation: 'fadeIn 0.3s' }}>
+            <p style={{ fontSize: 20, fontWeight: 800, color: '#333' }}>กำลังสุ่ม...</p>
+            <p style={{ fontSize: 13, color: '#bbb', marginTop: 4 }}>รอแป๊บนึงน้า 🙏</p>
+          </div>
+        )}
+
+        {phase === 'revealed' && result && (
+          <div style={{ width: '100%', animation: 'pop 0.4s ease' }}>
+            <div style={{ textAlign: 'center', padding: '20px', background: '#FFF8F0', borderRadius: 20, border: `2px solid ${accent}33` }}>
+              <p style={{ fontSize: 26, fontWeight: 900, color: '#222', marginBottom: 4 }}>{result.name}</p>
+              {result.dist && <p style={{ fontSize: 14, color: '#999' }}>📍 ไกลจากคุณ {result.dist}</p>}
+              {result.type && <p style={{ fontSize: 14, color: accent, fontWeight: 600 }}>{result.type}</p>}
+            </div>
+
+            {skips > 0 && (
+              <p style={{ textAlign: 'center', fontSize: 13, color: '#FF9800', marginTop: 10, fontWeight: 600 }}>
+                ⚠️ คุณสามารถข้ามได้อีก {MAX_SKIPS - skips} ครั้ง
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div style={{ padding: '16px 24px 34px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {phase === 'revealed' && (
+          <>
+            <Btn accent={accent} onClick={() => onNavigate('solo-personality', { skips, accept: 1 })}>
+              😋 กินได้!
+            </Btn>
+            <Btn variant="secondary" onClick={handleSkip} disabled={skips >= MAX_SKIPS}>
+              ⏭️ ขอข้าม {skips > 0 ? `(${skips}/${MAX_SKIPS})` : ''}
+            </Btn>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Screen: Solo Personality ──────────────────────────────────
+function SoloPersonalityScreen({ onNavigate, accent, params }) {
+  const { skips = 0 } = params;
+  const p = skips === 0 ? PERSONALITIES[0] : skips >= 3 ? PERSONALITIES[1] : PERSONALITIES[0];
+  const [copied, setCopied] = React.useState(false);
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '64px 20px 16px', gap: 12 }}>
+        <button onClick={() => onNavigate('home')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, padding: 4 }}>←</button>
+        <div style={{ fontSize: 20, fontWeight: 800, color: accent }}>กินไรดีวะ?</div>
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 24px', gap: 20 }}>
+        <div style={{ animation: 'pop 0.5s ease' }}>
+          <div style={{
+            width: 140, height: 140, borderRadius: '50%',
+            background: `${p.color}22`, border: `4px solid ${p.color}`,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            fontSize: 52, boxShadow: `0 0 0 12px ${p.color}11`,
+          }}>{p.icon}</div>
+        </div>
+
+        <div style={{ textAlign: 'center', animation: 'slideUp 0.4s ease 0.2s both' }}>
+          <p style={{ fontSize: 14, color: '#999', fontWeight: 600 }}>จากการสุ่ม คุณเป็นคนที่...</p>
+          <div style={{
+            marginTop: 12, padding: '20px 24px', borderRadius: 20,
+            background: `${p.color}15`, border: `2px solid ${p.color}44`,
+          }}>
+            <p style={{ fontSize: 26, fontWeight: 900, color: p.color }}>{p.label}</p>
+            <p style={{ fontSize: 14, color: '#555', marginTop: 8, lineHeight: 1.7, whiteSpace: 'pre-line' }}>{p.desc}</p>
+          </div>
+          {skips > 0 && (
+            <p style={{ fontSize: 13, color: '#bbb', marginTop: 12 }}>กดข้ามไป {skips} ครั้ง</p>
+          )}
+        </div>
+      </div>
+
+      <div style={{ padding: '16px 24px 34px', display: 'flex', flexDirection: 'column', gap: 10, animation: 'slideUp 0.4s ease 0.3s both' }}>
+        <Btn accent={accent} onClick={() => setCopied(true)} variant={copied ? 'secondary' : 'primary'}>
+          {copied ? '✓ คัดลอกลิงก์แชร์แล้ว!' : '📸 บันทึกรูปเพื่อแชร์ลงสตอรี่'}
+        </Btn>
+        <Btn variant="secondary" onClick={() => onNavigate('home')}>
+          🔄 สุ่มใหม่อีกครั้ง
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
+// ── Screen: Group — Enter Name ────────────────────────────────
+function GroupNameScreen({ onNavigate, accent, params }) {
+  const [name, setName] = React.useState('');
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '64px 20px 16px', gap: 12 }}>
+        <button onClick={() => onNavigate('home')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, padding: 4 }}>←</button>
+        <div style={{ fontSize: 20, fontWeight: 800, color: accent }}>กินไรดีวะ?</div>
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 24px', gap: 24 }}>
+        <div style={{ fontSize: 64, animation: 'bounce 1s ease infinite' }}>👥</div>
+        <div style={{ textAlign: 'center' }}>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: '#222' }}>บอกหน่อยสิว่าคุณเป็นใคร</h2>
+          <p style={{ fontSize: 14, color: '#999', marginTop: 6 }}>เพื่อนคุณจะได้รู้ว่าใครโหวตยังไง</p>
+        </div>
+        <div style={{ width: '100%' }}>
+          <input
+            placeholder="ใส่ชื่อของคุณ"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            style={{
+              width: '100%', padding: '16px', borderRadius: 14, border: `2px solid ${name ? accent : '#eee'}`,
+              fontFamily: 'Noto Sans Thai', fontSize: 16, outline: 'none', textAlign: 'center',
+              transition: 'border-color 0.2s',
+            }}
+          />
+        </div>
+      </div>
+
+      <div style={{ padding: '16px 24px 34px' }}>
+        <Btn accent={accent} disabled={!name.trim()} onClick={() => onNavigate('group-waiting', { ...params, myName: name.trim() })}>
+          สร้างห้องสุ่ม →
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
+// ── Screen: Group — Waiting Room ──────────────────────────────
+function GroupWaitingScreen({ onNavigate, accent, params }) {
+  const { myName = 'คุณ', randType } = params;
+  const [members, setMembers] = React.useState([myName]);
+  const [copied, setCopied] = React.useState(false);
+
+  // Simulate members joining
+  React.useEffect(() => {
+    let added = 0;
+    const names = MEMBERS.slice(0, 5);
+    const timer = setInterval(() => {
+      if (added < names.length) {
+        setMembers(m => [...m, names[added]]);
+        added++;
+      } else clearInterval(timer);
+    }, 900);
+    return () => clearInterval(timer);
+  }, []);
+
+  const typeLabel = randType === 'restaurant' ? 'สุ่มร้านอาหารใกล้คุณแบบกลุ่ม' : randType === 'type' ? 'สุ่มประเภทอาหารแบบกลุ่ม' : 'สุ่มเมนูแบบกลุ่ม';
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '64px 20px 12px', gap: 12 }}>
+        <button onClick={() => onNavigate('home')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 22, padding: 4 }}>←</button>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, color: '#999' }}>{typeLabel} · {members.length} คนในห้องนี้</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: accent }}>กินไรดีวะ?</div>
+        </div>
+        <button onClick={() => {}} style={{ fontSize: 13, color: '#999', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Noto Sans Thai' }}>ออก</button>
+      </div>
+
+      <div style={{ flex: 1, padding: '0 20px', overflow: 'auto' }}>
+        {/* Invite link */}
+        <div style={{ background: '#F8F8F8', borderRadius: 14, padding: '14px 16px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <p style={{ fontSize: 12, color: '#999' }}>ลิงก์เชิญเพื่อน</p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#444' }}>ginraideewa.app/room/XK9F2</p>
+          </div>
+          <button onClick={() => setCopied(true)} style={{
+            background: copied ? '#4CAF50' : accent, color: '#fff', border: 'none', borderRadius: 10,
+            padding: '8px 14px', fontFamily: 'Noto Sans Thai', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+          }}>{copied ? '✓' : 'คัดลอก'}</button>
+        </div>
+
+        {/* Status */}
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <div style={{ display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 12 }}>
+            {[0,1,2].map(i => (
+              <div key={i} style={{
+                width: 8, height: 8, borderRadius: '50%', background: accent,
+                animation: `bounce 0.6s ease-in-out ${i * 0.2}s infinite`,
+              }}/>
+            ))}
+          </div>
+          <p style={{ fontSize: 15, fontWeight: 700, color: '#555' }}>กำลังรอสมาชิกคนอื่น...</p>
+          <p style={{ fontSize: 13, color: '#bbb', marginTop: 4 }}>ส่งลิงก์ให้เพื่อนเลย!</p>
+        </div>
+
+        {/* Member list */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
+          {members.map((m, i) => (
+            <div key={m} style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+              animation: 'pop 0.3s ease',
+            }}>
+              <Avatar name={m} size={50} accent={accent}/>
+              <span style={{ fontSize: 12, color: '#666', fontWeight: 600 }}>{m === myName ? 'คุณ' : m}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ padding: '16px 24px 34px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <Btn accent={accent} disabled={members.length < 2} onClick={() => onNavigate('group-spin', { ...params, members, myName })}>
+          🎲 เริ่มสุ่ม! ({members.length} คน)
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
+// ── Screen: Group — Spinning ──────────────────────────────────
+function GroupSpinScreen({ onNavigate, accent, params }) {
+  const { members = [], myName = 'คุณ', randType } = params;
+
+  React.useEffect(() => {
+    const t = setTimeout(() => {
+      const result = rand(RESTAURANTS);
+      onNavigate('group-vote', { ...params, result, skipped: 0 });
+    }, 2000);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#fff', gap: 24 }}>
+      <SpinningWheel spinning={true} item={null} accent={accent}/>
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ fontSize: 22, fontWeight: 800, color: '#333' }}>เริ่มสุ่มแล้ว...</p>
+        <p style={{ fontSize: 14, color: '#bbb', marginTop: 6 }}>รอทุกคนด้วยน้า 🙏</p>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', padding: '0 40px' }}>
+        {members.map(m => (
+          <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Avatar name={m === myName ? 'คุณ' : m} size={32}/>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Screen: Group — Vote ──────────────────────────────────────
+function GroupVoteScreen({ onNavigate, accent, params }) {
+  const { result, members = [], myName = 'คุณ', skipped = 0 } = params;
+  const [myVote, setMyVote] = React.useState(null);
+  const [otherVotes, setOtherVotes] = React.useState({});
+  const MAX_SKIP = 3;
+
+  React.useEffect(() => {
+    // Simulate others voting
+    const others = members.filter(m => m !== myName);
+    others.forEach((m, i) => {
+      setTimeout(() => {
+        setOtherVotes(v => ({ ...v, [m]: Math.random() > 0.4 ? 'yes' : 'no' }));
+      }, 600 + i * 400);
+    });
+  }, []);
+
+  React.useEffect(() => {
+    if (myVote === null) return;
+    const allVoted = members.every(m => m === myName ? true : otherVotes[m]);
+    if (allVoted) {
+      const yesVotes = Object.values(otherVotes).filter(v => v === 'yes').length + (myVote === 'yes' ? 1 : 0);
+      const noVotes = members.length - yesVotes;
+      setTimeout(() => {
+        onNavigate('group-vote-result', { ...params, yesVotes, noVotes, otherVotes, myVote });
+      }, 800);
+    }
+  }, [myVote, otherVotes]);
+
+  const yesCount = Object.values(otherVotes).filter(v => v === 'yes').length + (myVote === 'yes' ? 1 : 0);
+  const noCount = Object.values(otherVotes).filter(v => v === 'no').length + (myVote === 'no' ? 1 : 0);
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '64px 20px 12px', gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, color: '#999' }}>สุ่มร้านอาหารใกล้คุณแบบกลุ่ม · {members.length} คนในห้องนี้</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: accent }}>กินไรดีวะ?</div>
+        </div>
+        <button onClick={() => {}} style={{ fontSize: 13, color: '#999', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Noto Sans Thai' }}>เปลี่ยน</button>
+      </div>
+
+      <div style={{ flex: 1, padding: '0 20px', overflow: 'auto' }}>
+        {/* Restaurant card */}
+        <div style={{ background: '#FFF8F0', borderRadius: 20, padding: '20px', border: `2px solid ${accent}33`, marginBottom: 16 }}>
+          <div style={{ fontSize: 40, textAlign: 'center', marginBottom: 8 }}>{result?.emoji}</div>
+          <p style={{ fontSize: 22, fontWeight: 900, color: '#222', textAlign: 'center' }}>{result?.name}</p>
+          {result?.dist && <p style={{ fontSize: 14, color: '#999', textAlign: 'center', marginTop: 4 }}>📍 ไกลจากคุณ {result.dist}</p>}
+        </div>
+
+        {skipped > 0 && (
+          <div style={{ background: '#FFF3CD', borderRadius: 12, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#856404', fontWeight: 600 }}>
+            ⚠️ คุณสามารถข้ามได้เพียง {MAX_SKIP - skipped} ครั้ง
+          </div>
+        )}
+
+        {/* Live vote status */}
+        <div style={{ background: '#F8F8F8', borderRadius: 14, padding: '14px 16px', marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#555' }}>ผลโหวตตอนนี้</span>
+            <span style={{ fontSize: 13, color: '#999' }}>{yesCount + noCount}/{members.length}</span>
+          </div>
+          <VoteBar yes={yesCount} no={noCount} total={members.length}/>
+        </div>
+
+        {/* Member vote status */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+          {members.map(m => {
+            const isMe = m === myName;
+            const vote = isMe ? myVote : otherVotes[m];
+            return (
+              <div key={m} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <div style={{ position: 'relative' }}>
+                  <Avatar name={isMe ? 'คุณ' : m} size={40}/>
+                  {vote && (
+                    <div style={{
+                      position: 'absolute', bottom: -2, right: -2,
+                      width: 18, height: 18, borderRadius: '50%',
+                      background: vote === 'yes' ? '#4CAF50' : '#FF3B30',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 10, animation: 'pop 0.2s ease',
+                    }}>{vote === 'yes' ? '✓' : '✕'}</div>
+                  )}
+                  {!vote && (
+                    <div style={{
+                      position: 'absolute', bottom: -2, right: -2,
+                      width: 18, height: 18, borderRadius: '50%',
+                      background: '#ddd', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10,
+                    }}>⏳</div>
+                  )}
+                </div>
+                <span style={{ fontSize: 11, color: '#888' }}>{isMe ? 'คุณ' : m}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ padding: '16px 24px 34px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {myVote === null ? (
+          <>
+            <Btn accent={accent} onClick={() => setMyVote('yes')}>😋 กินได้!</Btn>
+            <Btn variant="danger" onClick={() => setMyVote('no')} disabled={skipped >= MAX_SKIP}>⏭️ ขอข้าม</Btn>
+          </>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '12px', background: '#F0F8F0', borderRadius: 14 }}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: '#4CAF50' }}>
+              {myVote === 'yes' ? '✓ คุณกินได้! รอผลโหวตจากคนอื่น...' : '✕ คุณขอข้ามแล้ว รอผลโหวต...'}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Screen: Group — Vote Result ───────────────────────────────
+function GroupVoteResultScreen({ onNavigate, accent, params }) {
+  const { result, members = [], yesVotes = 3, noVotes = 2, otherVotes = {}, myVote, skipped = 0, myName = 'คุณ' } = params;
+  const [countdown, setCountdown] = React.useState(null);
+  const majority = yesVotes > noVotes;
+  const tied = yesVotes === noVotes;
+  const MAX_SKIP = 3;
+
+  React.useEffect(() => {
+    if (majority) {
+      setCountdown(3);
+      const t = setInterval(() => {
+        setCountdown(c => {
+          if (c <= 1) { clearInterval(t); onNavigate('group-final', params); return 0; }
+          return c - 1;
+        });
+      }, 1000);
+      return () => clearInterval(t);
+    }
+  }, []);
+
+  const handleReRoll = () => {
+    if (skipped >= MAX_SKIP) return;
+    const newResult = rand(RESTAURANTS);
+    onNavigate('group-vote', { ...params, result: newResult, skipped: skipped + 1 });
+  };
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '64px 20px 12px', gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, color: '#999' }}>สุ่มร้านอาหารแบบกลุ่ม · {members.length} คน</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: accent }}>ผลโหวต</div>
+        </div>
+        <button onClick={() => {}} style={{ fontSize: 13, color: '#999', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Noto Sans Thai' }}>เปลี่ยน</button>
+      </div>
+
+      <div style={{ flex: 1, padding: '0 20px', overflow: 'auto' }}>
+        {/* Result */}
+        <div style={{
+          background: majority ? '#F0FFF4' : '#FFF3F3',
+          borderRadius: 20, padding: '20px', marginBottom: 16,
+          border: `2px solid ${majority ? '#4CAF5044' : '#FF3B3044'}`,
+          textAlign: 'center',
+        }}>
+          <div style={{ fontSize: 36, marginBottom: 8 }}>{majority ? '🎉' : tied ? '🤝' : '😅'}</div>
+          <p style={{ fontSize: 18, fontWeight: 800, color: majority ? '#2e7d32' : tied ? '#555' : '#c62828' }}>
+            {majority ? 'ไปกินเลย!' : tied ? 'เสมอกัน! สุ่มใหม่?' : 'ส่วนใหญ่ขอข้าม'}
+          </p>
+          <p style={{ fontSize: 22, fontWeight: 900, color: '#222', marginTop: 4 }}>{result?.name}</p>
+          {result?.dist && <p style={{ fontSize: 13, color: '#999', marginTop: 2 }}>📍 {result.dist}</p>}
+        </div>
+
+        {/* Score */}
+        <div style={{ background: '#F8F8F8', borderRadius: 14, padding: '16px', marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: 12 }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 32, fontWeight: 900, color: '#4CAF50' }}>{yesVotes}</div>
+              <div style={{ fontSize: 13, color: '#888' }}>กินได้</div>
+            </div>
+            <div style={{ fontSize: 24, color: '#ccc', alignSelf: 'center' }}>VS</div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 32, fontWeight: 900, color: '#FF3B30' }}>{noVotes}</div>
+              <div style={{ fontSize: 13, color: '#888' }}>ขอข้าม</div>
+            </div>
+          </div>
+          {/* Members */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+            {members.map(m => {
+              const isMe = m === myName;
+              const vote = isMe ? myVote : otherVotes[m];
+              const color = vote === 'yes' ? '#4CAF50' : '#FF3B30';
+              return (
+                <div key={m} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', background: `${color}22`, border: `2px solid ${color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color }}>
+                    {(isMe ? 'คุณ' : m)[0]}
+                  </div>
+                  <span style={{ fontSize: 10, color: '#999' }}>{isMe ? 'คุณ' : m}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {majority && countdown > 0 && (
+          <div style={{ textAlign: 'center', padding: '8px', animation: 'countDown 1s ease' }}>
+            <p style={{ fontSize: 13, color: '#bbb' }}>กำลังนำทางไปยังหน้าใหม่ใน {countdown}...</p>
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: '16px 24px 34px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {(!majority || tied) && (
+          <Btn accent={accent} onClick={handleReRoll} disabled={skipped >= MAX_SKIP}>
+            🎲 สุ่มใหม่ {skipped > 0 ? `(${skipped}/${MAX_SKIP})` : ''}
+          </Btn>
+        )}
+        <Btn variant="secondary" onClick={() => onNavigate('home')}>🏠 กลับหน้าหลัก</Btn>
+      </div>
+    </div>
+  );
+}
+
+// ── Screen: Group — Final ─────────────────────────────────────
+function GroupFinalScreen({ onNavigate, accent, params }) {
+  const { result, members = [], myVote, otherVotes = {}, myName = 'คุณ' } = params;
+  const [showPersonality, setShowPersonality] = React.useState(false);
+
+  // Pick personality
+  const mySkips = Object.values({...otherVotes, [myName]: myVote}).filter(v => v === 'no').length;
+  const majorityVote = Object.values(otherVotes).reduce((acc, v) => { acc[v] = (acc[v] || 0) + 1; return acc; }, {});
+  const majority = (majorityVote.yes || 0) > (majorityVote.no || 0) ? 'yes' : 'no';
+  const p = myVote !== majority ? PERSONALITIES[2] : mySkips === 0 ? PERSONALITIES[0] : PERSONALITIES[1];
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '64px 20px 12px', gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, color: '#999' }}>ผลลัพธ์การสุ่ม · {members.length} คน</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: accent }}>กินไรดีวะ?</div>
+        </div>
+        <button onClick={() => onNavigate('home')} style={{ fontSize: 13, color: '#999', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Noto Sans Thai' }}>ออก</button>
+      </div>
+
+      <div style={{ flex: 1, padding: '0 20px', overflow: 'auto' }}>
+        <div style={{ animation: 'pop 0.5s ease', background: `${accent}15`, borderRadius: 20, padding: '24px 20px', textAlign: 'center', marginBottom: 16 }}>
+          <div style={{ fontSize: 52, marginBottom: 8 }}>{result?.emoji}</div>
+          <p style={{ fontSize: 24, fontWeight: 900, color: accent }}>{result?.name}</p>
+          {result?.dist && <p style={{ fontSize: 14, color: '#999', marginTop: 4 }}>📍 {result.dist}</p>}
+          <button style={{
+            marginTop: 12, background: 'white', border: `1.5px solid ${accent}`, borderRadius: 10,
+            padding: '8px 16px', color: accent, fontFamily: 'Noto Sans Thai', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+          }}>🗺️ ดูแผนที่</button>
+        </div>
+
+        {/* เบาสมองโซน */}
+        <div style={{
+          background: '#F8F0FF', borderRadius: 20, padding: '20px',
+          border: '2px solid #E1BEE744', marginBottom: 12,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <p style={{ fontSize: 15, fontWeight: 800, color: '#7B1FA2' }}>เบาสมองโซน ✨</p>
+            <button onClick={() => setShowPersonality(!showPersonality)} style={{ fontSize: 13, color: '#9C27B0', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Noto Sans Thai', fontWeight: 600 }}>
+              {showPersonality ? 'ซ่อน ↑' : 'ดู ↓'}
+            </button>
+          </div>
+          <p style={{ fontSize: 14, color: '#555', marginBottom: 10 }}>ในแก๊งเพื่อนคุณเป็นคนที่...</p>
+
+          {showPersonality && (
+            <div style={{ animation: 'slideUp 0.3s ease' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: `${p.color}15`, borderRadius: 14, padding: '14px' }}>
+                <span style={{ fontSize: 40 }}>{p.icon}</span>
+                <div>
+                  <p style={{ fontSize: 18, fontWeight: 800, color: p.color }}>{p.label}</p>
+                  <p style={{ fontSize: 13, color: '#555', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{p.desc}</p>
+                </div>
+              </div>
+              <button style={{
+                marginTop: 10, width: '100%', background: 'white', border: `1.5px solid #E1BEE7`,
+                borderRadius: 12, padding: '10px', color: '#7B1FA2', fontFamily: 'Noto Sans Thai',
+                fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}>📸 บันทึกรูปเพื่อแชร์ลงสตอรี่</button>
+            </div>
+          )}
+        </div>
+
+        {/* All members */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', padding: '8px 0' }}>
+          {members.map(m => {
+            const isMe = m === myName;
+            const vote = isMe ? myVote : otherVotes[m];
+            return (
+              <div key={m} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <Avatar name={isMe ? 'คุณ' : m} size={44}/>
+                <span style={{ fontSize: 11, color: '#888' }}>{isMe ? 'คุณ' : m}</span>
+                <span style={{ fontSize: 10, color: vote === 'yes' ? '#4CAF50' : '#FF3B30', fontWeight: 700 }}>{vote === 'yes' ? '✓' : '✕'}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ padding: '16px 24px 34px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <Btn accent={accent} onClick={() => onNavigate('group-name', { randType: params.randType })}>🔄 สุ่มใหม่อีกรอบ</Btn>
+        <Btn variant="secondary" onClick={() => onNavigate('home')}>🏠 กลับหน้าหลัก</Btn>
+      </div>
+    </div>
+  );
+}
+
+// ── App Shell ─────────────────────────────────────────────────
+function App() {
+  const saved = (() => { try { return JSON.parse(localStorage.getItem('ginraideewa_state') || '{}'); } catch { return {}; } })();
+  const [screen, setScreen] = React.useState(saved.screen || 'home');
+  const [params, setParams] = React.useState(saved.params || {});
+  const [tweaks, setTweaks] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem('ginraideewa_tweaks') || 'null') || TWEAK_DEFAULTS; }
+    catch { return TWEAK_DEFAULTS; }
+  });
+  const [tweaksOpen, setTweaksOpen] = React.useState(false);
+
+  const navigate = (s, p = {}) => {
+    setScreen(s); setParams(p);
+    try { localStorage.setItem('ginraideewa_state', JSON.stringify({ screen: s, params: p })); } catch {}
+  };
+
+  // Tweaks protocol
+  React.useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type === '__activate_edit_mode') setTweaksOpen(true);
+      if (e.data?.type === '__deactivate_edit_mode') setTweaksOpen(false);
+    };
+    window.addEventListener('message', handler);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const setTweak = (k, v) => {
+    const next = { ...tweaks, [k]: v };
+    setTweaks(next);
+    try { localStorage.setItem('ginraideewa_tweaks', JSON.stringify(next)); } catch {}
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { [k]: v } }, '*');
+  };
+
+  const accent = tweaks.accentColor;
+
+  const screenMap = {
+    'home': <HomeScreen onNavigate={navigate} accent={accent}/>,
+    'solo-spin': <SoloSpinScreen onNavigate={navigate} accent={accent} params={params}/>,
+    'solo-personality': <SoloPersonalityScreen onNavigate={navigate} accent={accent} params={params}/>,
+    'group-name': <GroupNameScreen onNavigate={navigate} accent={accent} params={params}/>,
+    'group-waiting': <GroupWaitingScreen onNavigate={navigate} accent={accent} params={params}/>,
+    'group-spin': <GroupSpinScreen onNavigate={navigate} accent={accent} params={params}/>,
+    'group-vote': <GroupVoteScreen onNavigate={navigate} accent={accent} params={params}/>,
+    'group-vote-result': <GroupVoteResultScreen onNavigate={navigate} accent={accent} params={params}/>,
+    'group-final': <GroupFinalScreen onNavigate={navigate} accent={accent} params={params}/>,
+  };
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <IOSDevice width={390} height={844} dark={tweaks.darkMode}>
+        <div style={{ height: '100%', fontFamily: 'Noto Sans Thai, system-ui', overflow: 'hidden' }}>
+          {screenMap[screen] || screenMap['home']}
+        </div>
+      </IOSDevice>
+
+      {/* Tweaks Panel */}
+      {tweaksOpen && (
+        <div style={{
+          position: 'fixed', bottom: 24, right: 24, width: 280,
+          background: 'white', borderRadius: 20, boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+          padding: '20px', zIndex: 9999, fontFamily: 'Noto Sans Thai, system-ui',
+        }}>
+          <p style={{ fontSize: 16, fontWeight: 800, marginBottom: 16, color: '#222' }}>Tweaks</p>
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 13, color: '#666', fontWeight: 600, display: 'block', marginBottom: 8 }}>Accent Color</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {['#FF6B00','#E91E63','#2196F3','#4CAF50','#9C27B0','#FF5722'].map(c => (
+                <button key={c} onClick={() => setTweak('accentColor', c)} style={{
+                  width: 32, height: 32, borderRadius: '50%', background: c, border: accent === c ? '3px solid #333' : '2px solid transparent',
+                  cursor: 'pointer', transition: 'border 0.15s',
+                }}/>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ fontSize: 13, color: '#666', fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              Dark Mode
+              <div onClick={() => setTweak('darkMode', !tweaks.darkMode)} style={{
+                width: 44, height: 26, borderRadius: 13, background: tweaks.darkMode ? accent : '#ddd',
+                position: 'relative', cursor: 'pointer', transition: 'background 0.2s',
+              }}>
+                <div style={{
+                  width: 20, height: 20, borderRadius: '50%', background: 'white',
+                  position: 'absolute', top: 3, left: tweaks.darkMode ? 21 : 3,
+                  transition: 'left 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                }}/>
+              </div>
+            </label>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 13, color: '#666', fontWeight: 600, display: 'block', marginBottom: 8 }}>Current Screen</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {[
+                ['home','🏠 Home'],
+                ['solo-spin','🎲 Solo Spin'],
+                ['solo-personality','🧠 Solo Personality'],
+                ['group-name','👤 Group Name'],
+                ['group-waiting','⏳ Group Waiting'],
+                ['group-vote','🗳️ Group Vote'],
+                ['group-final','🎉 Group Final'],
+              ].map(([s, label]) => (
+                <button key={s} onClick={() => navigate(s, params)} style={{
+                  padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${screen === s ? accent : '#eee'}`,
+                  background: screen === s ? `${accent}15` : 'white', color: screen === s ? accent : '#555',
+                  fontFamily: 'Noto Sans Thai', fontSize: 13, fontWeight: screen === s ? 700 : 500, cursor: 'pointer', textAlign: 'left',
+                }}>{label}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App/>);
+</script>
+<div id="root"></div>
+
+<template id="__bundler_thumbnail">
+<svg viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
+  <rect width="120" height="80" fill="#FF6B00"/>
+  <text x="60" y="48" text-anchor="middle" font-size="32" fill="white">🍽️</text>
+</svg>
+</template>
+</body>
+</html>
